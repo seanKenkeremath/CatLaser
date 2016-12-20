@@ -11,8 +11,8 @@ laser_on = False
 
 auto_mode_on = False
 
-jitter_count_max = 3 #How many loops before the jitter direction is reset
-jitter_sensitivity = 1 #How intense the jitter is (how far it can wander in a single movement)
+jitter_count_max = 6 #How many loops before the jitter direction is reset
+jitter_sensitivity = .75 #How intense the jitter is (how far it can wander in a single movement)
 jitter_pause_max = 6 #Loops between new jitter direction (how long of a pause between). Random number between 0 and this is taken when jitter direction assigned
 jitter_count = 0 #timer used for jitter direction
 jitter_pause = 0 #assigned random number from 0 to jitter_pause_max
