@@ -1,5 +1,6 @@
 import Adafruit_BBIO.PWM as PWM
 import Adafruit_BBIO.GPIO as GPIO
+import os
 import getch
 import math
 import random
@@ -7,6 +8,7 @@ import time
 import sys
 import atexit
 
+temp_file = sys.path[0] + "/isrunning.tmp"
 laser_on = False
 
 auto_mode_on = False
@@ -14,10 +16,15 @@ auto_mode_on = False
 jitter_count_max = 6 #How many loops before the jitter direction is reset
 jitter_sensitivity = .75 #How intense the jitter is (how far it can wander in a single movement)
 jitter_pause_max = 6 #Loops between new jitter direction (how long of a pause between). Random number between 0 and this is taken when jitter direction assigned
+
+
 jitter_count = 0 #timer used for jitter direction
 jitter_pause = 0 #assigned random number from 0 to jitter_pause_max
 curr_jitter_angle = 0 #angle used for jitter direction (randomly assigned radian. cos and sin are added to top and bottom servo angles)
 
+auto_run_length_seconds = 180 #default amount of time --auto runs for unless time is specified with -t param  
+start_time = time.time()
+stop_time = 0 #set after parameters are read. start time of execution + run length in seconds
 
 laser_pin = "P8_10"
 servo_pin_top = "P8_13"
@@ -34,26 +41,47 @@ duty_min = 5
 duty_max = 10
 duty_span = duty_max - duty_min
 
+
+#Create a temporary file before we set up
+#tmp file indicates script is running
+#Only 1 copy of script should run at a time
+if (os.path.exists(temp_file)):
+	print "Cat Laser is already running"
+	sys.exit()
+else:
+	print "creating tmp file"
+	open(temp_file, 'a')
+
 GPIO.setup(laser_pin, GPIO.OUT)
 GPIO.output(laser_pin, GPIO.HIGH if laser_on else GPIO.LOW)
 
 PWM.start(servo_pin_top, 100-(duty_min + duty_span * servo_start_angle_top/180), duty_freq, 1)
 PWM.start(servo_pin_bottom, 100-(duty_min + duty_span * servo_start_angle_bottom/180), duty_freq, 1)
 
-for arg in sys.argv:
-	print arg
+i = 0
+while i < len(sys.argv):
+	arg = sys.argv[i]
 	if arg == "--auto":
 		auto_mode_on = True
+	if arg == "-t":
+		auto_run_length_seconds = int(sys.argv[i+1])
+		i+=1
+	i += 1
 
 if auto_mode_on:
+	stop_time = start_time + auto_run_length_seconds
+	print "running auto mode for " + str(auto_run_length_seconds) + " seconds until " + str(stop_time)
 	laser_on = True
 	GPIO.output(laser_pin, GPIO.HIGH)
 
 def clean_up():
+	print "Cleaning up"
 	PWM.stop(servo_pin_top)
 	PWM.stop(servo_pin_bottom)
 	PWM.cleanup()
 	GPIO.cleanup()
+	if os.path.isfile(temp_file):
+		os.remove(temp_file)
 
 atexit.register(clean_up)
 
@@ -61,14 +89,17 @@ while True:
 
 	input = ''
 	do_jitter = False
+	stop = False
 
 	if auto_mode_on:
+		if time.time() > start_time + auto_run_length_seconds:
+			stop = True
 		time.sleep(.01)
 		do_jitter = True
 	else:
 		input = getch.getch()
 
-	if input == 'x' or input == 'X':
+	if stop or input == 'x' or input == 'X':
 		clean_up()
 		break;
 	else:
