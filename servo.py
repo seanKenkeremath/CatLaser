@@ -7,9 +7,16 @@ import random
 import time
 import sys
 import atexit
+import socket
+
+
+#for socket connection
+socket_host = '127.0.0.1'
+socket_port = int(7779) #default port
+socket_mode = False
 
 temp_file = sys.path[0] + "/isrunning.tmp"
-laser_on = False
+laser_on = True
 
 auto_mode_on = False
 
@@ -66,6 +73,11 @@ while i < len(sys.argv):
 	if arg == "-t":
 		auto_run_length_seconds = int(sys.argv[i+1])
 		i+=1
+	if arg == "--socket":
+		socket_mode = True
+	if arg =="-p":
+		socket_port = int(sys.argv[i+1])
+		i+=1
 	i += 1
 
 if auto_mode_on:
@@ -73,6 +85,17 @@ if auto_mode_on:
 	print "running auto mode for " + str(auto_run_length_seconds) + " seconds until " + str(stop_time)
 	laser_on = True
 	GPIO.output(laser_pin, GPIO.HIGH)
+elif socket_mode:
+	print "opening socket on " + socket_host + ":" + str(socket_port)
+	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	s.bind((socket_host,socket_port))
+	s.listen(1)
+
+def command_from_socket():
+	conn,addr = s.accept()
+	data=conn.recv(256)
+	data=data.decode("utf-8")
+	return data
 
 def clean_up():
 	print "Cleaning up"
@@ -91,11 +114,16 @@ while True:
 	do_jitter = False
 	stop = False
 
+	if not os.path.exists(temp_file):
+		print "marker file removed. stopping execution"
+		stop = True
 	if auto_mode_on:
 		if time.time() > start_time + auto_run_length_seconds:
 			stop = True
 		time.sleep(.01)
 		do_jitter = True
+	elif socket_mode:
+		input = command_from_socket()	
 	else:
 		input = getch.getch()
 
